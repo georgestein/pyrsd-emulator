@@ -1,0 +1,2 @@
+class PowerspectraDataset(torch.utils.data.Dataset):
+class PowerspectraDataset(torch.utils.data.Dataset):
