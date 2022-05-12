@@ -91,11 +91,14 @@ class MLP(pl.LightningModule):
         y_pred = self(x)
         noise_floor = 1e-9
         if self.cosmo_to_pk:
+            # Negative Gaussian log likelihood loss
             loss = torch.sum(
                 torch.log(sig_x**2 + noise_floor)/2
                 + (y - y_pred)**2/(2*sig_x**2+noise_floor),
             )      
         else:
             loss = F.mse_loss(y, self(x))
+
         self.log(f"{stage}_loss", loss, on_step=True)
+
         return loss
