@@ -79,22 +79,22 @@ class MLP(pl.LightningModule):
         return [optimizer], [scheduler]
 
     def _prepare_batch(self, batch):
-        x, sig_x, y = batch
+        x, y, sig_y = batch
         if self.cosmo_to_pk:
-            return y, sig_x, x
+            return x, y, sig_y
         else:
-            return x, sig_x, y
+            return y, x, sig_y
         
     def _common_step(self, batch, batch_idx, stage: str):
-        x, sig_x, y = self._prepare_batch(batch)
+        x, y, sig_y = self._prepare_batch(batch)
     
         y_pred = self(x)
         noise_floor = 1e-9
         if self.cosmo_to_pk:
             # Negative Gaussian log likelihood loss
             loss = torch.sum(
-                torch.log(sig_x**2 + noise_floor)/2
-                + (y - y_pred)**2/(2*sig_x**2+noise_floor),
+                torch.log(sig_y**2 + noise_floor)/2
+                + (y - y_pred)**2/(2*sig_y**2+noise_floor),
             )      
         else:
             loss = F.mse_loss(y, self(x))

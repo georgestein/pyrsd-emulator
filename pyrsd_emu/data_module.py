@@ -18,53 +18,86 @@ class PowerspectraDataset(torch.utils.data.Dataset):
     -----------
     data_path:
         Path to powerspectra file
+    norm_path:
+        Path to file containing mean and std measured over training set
     transform:
         data augmentations to use
     """
     def __init__(
         self,
         data_path,
+        norm_path,
         transform,
         multipole_order=3,
+        pk_type='nonlin_convolved'
     ):
         self.data_path  = data_path
+        self.norm_path = norm_path
         self.transforms = transform
+
         self.multipole_order = multipole_order
-        
+        self.pk_type = pk_type
+
         self.param_min = np.array([1.8, 1.2, 0.6, 1., 0., 0., 0.55, 1.15, 0.5, 0., 0.], dtype=np.float32)
         self.param_max = np.array([3.0, 2.5, 1., 7., 0.25, 1., 2.35, 2.95, 0.9, 3., 18.], dtype=np.float32)
     
+
+        if not os.path.isfile(self.norm_path):
+            self.pk_mean, self.pk_std = 0., 1. 
+        else:
+            self.pk_mean, self.pk_std = np.loadtxt(self.norm_path, unpack=True)
+
     def _open_file(self):
         self.hfile = h5py.File(self.data_path,'r')
 
     def __len__(self):
         with h5py.File(self.data_path, 'r') as hf:
-            self.n_samples = hf['pk0_r'].shape[0]
+            self.n_samples = hf[f'pk0_{self.pk_type}'].shape[0]
                 
         return self.n_samples
 
-    def normalize_model_params(self, params):
+    def normalize_model_params(self, params, inv=False):
 
-        return (params - self.param_min)/(self.param_max - self.param_min)
+        if not inv:
+            return (params - self.param_min)/(self.param_max - self.param_min)
 
+        return params*(self.param_max - self.param_min) + self.param_min
+    
+    def normalize_pk(self, pk, use_mean=True, inv=False):
+
+        if not inv:
+            if use_mean:
+                return (pk - self.pk_mean)/self.pk_std
+            else:
+                return pk/self.pk_std
+
+        if use_mean:
+            return pk * self.pk_std + self.pk_mean
+        else:
+            return pk * self.pk_std
+
+            
     def __getitem__(self, idx: int):
 
         if not hasattr(self, 'hfile'):
             self._open_file()
 
         # Concatenate desired powerspectra multipoles along last dimension
-        x = np.hstack(
-            [self.hfile[f"pk{i*2}_r"][idx] for i in range(self.multipole_order)],
+        y = np.hstack(
+            [self.hfile[f"pk{i*2}_{self.pk_type}"][idx] for i in range(self.multipole_order)],
         )
-        sig_x = np.hstack(
-            [self.hfile[f"pk{i*2}_r_sig"][idx] for i in range(self.multipole_order)],
+        sig_y = np.hstack(
+            [self.hfile[f"pk{i*2}_sig"][idx] for i in range(self.multipole_order)],
         )
-        
-        y = self.hfile['model_params'][idx]
-        y = self.normalize_model_params(y) 
+        sig_y *= np.sqrt(1000)
+
+        y, sig_y = self.normalize_pk(y), self.normalize_pk(sig_y, use_mean=False)
+
+        x = self.hfile['model_params'][idx]
+        x = self.normalize_model_params(x) 
         # x = self.transforms(x) 
 
-        return x, sig_x, y
+        return x, y, sig_y
 
 class PowerspectraDataModule(pl.LightningDataModule):
     """
@@ -85,7 +118,8 @@ class PowerspectraDataModule(pl.LightningDataModule):
         
         self.train_path = self.params.get("train_path", "./")
         self.val_path = self.params.get("val_path", "./") # Set val to same as train
-        
+        self.norm_path = self.params.get("norm_path", "./") # path to file containing normalization measured over training set
+
         self.multipole_order = self.params.get('multipole_order', 3)
 
         self.num_workers = self.params.get("num_workers", 1)
@@ -97,7 +131,6 @@ class PowerspectraDataModule(pl.LightningDataModule):
                 
     def _default_transforms(self) -> Callable:
 
-   
         # transform = DecalsTransforms(self.params)
         transform = None
         
@@ -120,6 +153,7 @@ class PowerspectraDataModule(pl.LightningDataModule):
             train_transforms = self._default_transforms() if self.train_transforms is None else self.train_transforms
             self.train_dataset = PowerspectraDataset(
                 self.train_path,
+                self.norm_path,
                 train_transforms,
                 multipole_order=self.multipole_order,
             )
@@ -129,6 +163,7 @@ class PowerspectraDataModule(pl.LightningDataModule):
             val_transforms = self._default_transforms() if self.val_transforms is None else self.val_transforms
             self.val_dataset = PowerspectraDataset(
                 self.val_path,
+                self.norm_path,
                 val_transforms,
                 multipole_order=self.multipole_order,
             )
@@ -139,6 +174,7 @@ class PowerspectraDataModule(pl.LightningDataModule):
             # Predict over all training data
             self.predict_dataset = PowerspectraDataset(
                 self.train_path,
+                self.norm_path,
                 predict_transforms,
                 multipole_order=self.multipole_order,
             )

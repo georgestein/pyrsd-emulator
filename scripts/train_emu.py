@@ -30,7 +30,7 @@ def parse_arguments():
     parser.add_argument("--input_dim", type=int, default=11,
                         help="Input dimensionality")
 
-    parser.add_argument("--hidden_dims", nargs='+', default=[128, 128, 128],
+    parser.add_argument("--hidden_dims", nargs='+', default=[256, 256, 256, 256],
                         help="Input dimensionality")
 
     # Data loading
@@ -39,7 +39,10 @@ def parse_arguments():
 
     parser.add_argument("--val_path", type=str, default='../data/powerspectra_11param_val.h5',
                         help="Path to hdf5 data file")
-       
+ 
+    parser.add_argument("--norm_path", type=str, default='../data/pk_nonlin_convolved_mean_std_normalization.txt',
+                        help="Path to hdf5 data file")
+             
     parser.add_argument("--num_workers", type=int, default=8,
                         help="number of data loader workers")
 
@@ -64,13 +67,13 @@ def parse_arguments():
                         help="Checkpoint model every n epochs")
 
     # Optimizers
-    parser.add_argument("--batch_size", type=int, default=32,
+    parser.add_argument("--batch_size", type=int, default=16,
                         help="Batch size for model training")
 
-    parser.add_argument("--learning_rate", type=float, default=0.005,
+    parser.add_argument("--learning_rate", type=float, default=0.0001,
                         help="Learning rate for model optimization")
 
-    parser.add_argument("--max_epochs", type=int, default=1,
+    parser.add_argument("--max_epochs", type=int, default=100,
                         help="Max number of training epochs")
 
     parser.add_argument("--optimizer", type=str, default='Adam',
@@ -122,7 +125,6 @@ def main(args):
     model = mlp.MLP(params)
 
     datamodule = data_module.PowerspectraDataModule(params)
-
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=params['OUTPUT_DIR'],
