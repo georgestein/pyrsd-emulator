@@ -41,7 +41,6 @@ class PowerspectraDataset(torch.utils.data.Dataset):
         self.param_min = np.array([1.8, 1.2, 0.6, 1., 0., 0., 0.55, 1.15, 0.5, 0., 0.], dtype=np.float32)
         self.param_max = np.array([3.0, 2.5, 1., 7., 0.25, 1., 2.35, 2.95, 0.9, 3., 18.], dtype=np.float32)
     
-
         if not os.path.isfile(self.norm_path):
             self.pk_mean, self.pk_std = 0., 1. 
         else:
@@ -59,10 +58,15 @@ class PowerspectraDataset(torch.utils.data.Dataset):
     def normalize_model_params(self, params, inv=False):
 
         if not inv:
-            return (params - self.param_min)/(self.param_max - self.param_min)
+            return (params - self.param_min)/(self.param_max - self.param_min) 
 
-        return params*(self.param_max - self.param_min) + self.param_min
-    
+        return params * (self.param_max - self.param_min) + self.param_min
+ 
+        # if not inv:
+        #     return 2*(params - self.param_min)/(self.param_max - self.param_min) - 1
+
+        # return (params + 1)/2 * (self.param_max - self.param_min) + self.param_min
+       
     def normalize_pk(self, pk, use_mean=True, inv=False):
 
         if not inv:

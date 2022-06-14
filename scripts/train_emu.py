@@ -89,7 +89,7 @@ def parse_arguments():
     parser.add_argument("--ckpt_path", type=str, default=None,
                         help="Continue training from checkpoint on disk")
 
-    parser.add_argument("--OUTPUT_DIR", type=str, default='../model_outputs/',
+    parser.add_argument("--OUTPUT_DIR", type=str, default='../experiments/',
                         help="directory to save trained model and logs")
 
     parser.add_argument("--logfile_name", type=str, default='train_emulator.log',
@@ -108,7 +108,8 @@ def main(args):
 
     params['cosmo_to_pk'] = True
     params['output_dim'] = 76*params['multipole_order'] 
-
+    params['hidden_dims'] = [int(i) for i in params['hidden_dims']]
+    
     params['OUTPUT_DIR'] = os.path.join(params['OUTPUT_DIR'], f"mlp_cosmo_to_pk_dims_{'_'.join(str(i) for i in params['hidden_dims'])}/")
     Path(params['OUTPUT_DIR']).mkdir(parents=True, exist_ok=True)
 
