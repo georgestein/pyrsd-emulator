@@ -27,17 +27,17 @@ def parse_arguments():
     parser.add_argument("--multipole_order", type=int, default=3,
                         help="Multipole orders to use for training [1,2,3]", choices=[1,2,3])
 
-    parser.add_argument("--input_dim", type=int, default=11,
+    parser.add_argument("--input_dim", type=int, default=7,
                         help="Input dimensionality")
 
     parser.add_argument("--hidden_dims", nargs='+', default=[256, 256, 256, 256],
                         help="Input dimensionality")
 
     # Data loading
-    parser.add_argument("--train_path", type=str, default='../data/powerspectra_11param_train.h5',
+    parser.add_argument("--train_path", type=str, default='../data/powerspectra_7param_train.h5',
                         help="Path to hdf5 data file")
 
-    parser.add_argument("--val_path", type=str, default='../data/powerspectra_11param_val.h5',
+    parser.add_argument("--val_path", type=str, default='../data/powerspectra_7param_val.h5',
                         help="Path to hdf5 data file")
  
     parser.add_argument("--norm_path", type=str, default='../data/pk_nonlin_convolved_mean_std_normalization.txt',
@@ -67,7 +67,7 @@ def parse_arguments():
                         help="Checkpoint model every n epochs")
 
     # Optimizers
-    parser.add_argument("--batch_size", type=int, default=16,
+    parser.add_argument("--batch_size", type=int, default=32,
                         help="Batch size for model training")
 
     parser.add_argument("--learning_rate", type=float, default=0.0001,

@@ -38,9 +38,14 @@ class PowerspectraDataset(torch.utils.data.Dataset):
         self.multipole_order = multipole_order
         self.pk_type = pk_type
 
-        self.param_min = np.array([1.8, 1.2, 0.6, 1., 0., 0., 0.55, 1.15, 0.5, 0., 0.], dtype=np.float32)
-        self.param_max = np.array([3.0, 2.5, 1., 7., 0.25, 1., 2.35, 2.95, 0.9, 3., 18.], dtype=np.float32)
-    
+        # all 11 params
+        # self.param_min = np.array([1.8, 1.2, 0.6, 1., 0., 0., 0.55, 1.15, 0.5, 0., 0.], dtype=np.float32)
+        # self.param_max = np.array([3.0, 2.5, 1., 7., 0.25, 1., 2.35, 2.95, 0.9, 3., 18.], dtype=np.float32)
+
+        # 7 params that actually have an effect
+        self.param_min = np.array([1.2, 0.6, 0., 0., 0.5, 0., 0.], dtype=np.float32)
+        self.param_max = np.array([2.5, 1., 0.25, 1., 0.9, 3., 18.], dtype=np.float32)
+       
         if not os.path.isfile(self.norm_path):
             self.pk_mean, self.pk_std = 0., 1. 
         else:
@@ -57,15 +62,15 @@ class PowerspectraDataset(torch.utils.data.Dataset):
 
     def normalize_model_params(self, params, inv=False):
 
-        if not inv:
-            return (params - self.param_min)/(self.param_max - self.param_min) 
-
-        return params * (self.param_max - self.param_min) + self.param_min
- 
         # if not inv:
-        #     return 2*(params - self.param_min)/(self.param_max - self.param_min) - 1
+        #     return (params - self.param_min)/(self.param_max - self.param_min) 
 
-        # return (params + 1)/2 * (self.param_max - self.param_min) + self.param_min
+        # return params * (self.param_max - self.param_min) + self.param_min
+ 
+        if not inv:
+            return 2*(params - self.param_min)/(self.param_max - self.param_min) - 1
+
+        return (params + 1)/2 * (self.param_max - self.param_min) + self.param_min
        
     def normalize_pk(self, pk, use_mean=True, inv=False):
 
@@ -90,9 +95,17 @@ class PowerspectraDataset(torch.utils.data.Dataset):
         y = np.hstack(
             [self.hfile[f"pk{i*2}_{self.pk_type}"][idx] for i in range(self.multipole_order)],
         )
+
+        # If sig_y does not vary for each data sample
         sig_y = np.hstack(
-            [self.hfile[f"pk{i*2}_sig"][idx] for i in range(self.multipole_order)],
+            [self.hfile[f"pk{i*2}_sig"] for i in range(self.multipole_order)],
         )
+
+        # if sig_y does vary
+        # sig_y = np.hstack(
+        #     [self.hfile[f"pk{i*2}_sig"][idx] for i in range(self.multipole_order)],
+        # )
+        
         sig_y *= np.sqrt(1000)
 
         y, sig_y = self.normalize_pk(y), self.normalize_pk(sig_y, use_mean=False)
