@@ -33,7 +33,7 @@ Then, pip/conda install the other required packages, including
 
 Install the pyrsd_emu package
 	
-	# from <current_dir>/pyrsd-emulator run:
+	# from <current_dir>/pyrsd-emulator/ run:
 	pip install -e .
 
 IMPORTANT: This conda environment will run fine in say ipython, but to get the `posterior_analysis.ipynb` notebook running you need to follow the instructions here <https://docs.nersc.gov/services/jupyter/>, INCLUDING THE "Customizing Kernels with a Helper Shell Script" PORTION: 
