@@ -31,6 +31,11 @@ Then, pip/conda install the other required packages, including
 	pip install numpyro[cuda] -f https://storage.googleapis.com/jax-releases/jax_releases.html
 	...
 
+Install the pyrsd_emu package
+	
+	# from <current_dir>/pyrsd-emulator run:
+	pip install -e .
+
 IMPORTANT: This conda environment will run fine in say ipython, but to get the `posterior_analysis.ipynb` notebook running you need to follow the instructions here <https://docs.nersc.gov/services/jupyter/>, INCLUDING THE "Customizing Kernels with a Helper Shell Script" PORTION: 
 
 First, add kernel to jupyter (access at https://jupyter.nersc.gov/hub/home)
