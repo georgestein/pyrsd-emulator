@@ -27,15 +27,20 @@ class PowerspectraDataset(torch.utils.data.Dataset):
         self,
         data_path,
         norm_path,
-        transform,
+        covariance_path,
+        transform=None,
+        output_dim=228,
         multipole_order=3,
         pk_type='nonlin_convolved'
     ):
         self.data_path  = data_path
         self.norm_path = norm_path
+        self.covariance_path = covariance_path
         self.transforms = transform
 
+        self.output_dim = output_dim
         self.multipole_order = multipole_order
+
         self.pk_type = pk_type
 
         # all 11 params
@@ -46,11 +51,22 @@ class PowerspectraDataset(torch.utils.data.Dataset):
         self.param_min = np.array([1.2, 0.6, 0., 0., 0.5, 0., 0.], dtype=np.float32)
         self.param_max = np.array([2.5, 1., 0.25, 1., 0.9, 3., 18.], dtype=np.float32)
        
+        # Load data normalizations
         if not os.path.isfile(self.norm_path):
             self.pk_mean, self.pk_std = 0., 1. 
         else:
             self.pk_mean, self.pk_std = np.loadtxt(self.norm_path, unpack=True)
 
+        # Load covariance matrix
+        if not os.path.isfile(self.covariance_path):
+            self.covariance_matrix = torch.eye(params['output_dim']) 
+        else:
+            self.covariance_matrix = torch.Tensor(np.load(self.covariance_path).astype(np.float32))
+            self.normalize_pk(self.covariance_matrix, use_mean=False)
+
+            self.covariance_matrix_inv = torch.linalg.inv(self.covariance_matrix)
+
+    
     def _open_file(self):
         self.hfile = h5py.File(self.data_path,'r')
 
@@ -97,24 +113,27 @@ class PowerspectraDataset(torch.utils.data.Dataset):
         )
 
         # If sig_y does not vary for each data sample
-        sig_y = np.hstack(
-            [self.hfile[f"pk{i*2}_sig"] for i in range(self.multipole_order)],
-        )
+        # sig_y = np.hstack(
+        #     [self.hfile[f"pk{i*2}_sig"] for i in range(self.multipole_order)],
+        # )
 
         # if sig_y does vary
         # sig_y = np.hstack(
         #     [self.hfile[f"pk{i*2}_sig"][idx] for i in range(self.multipole_order)],
         # )
         
-        sig_y *= np.sqrt(1000)
+        # sig_y *= np.sqrt(1000)
 
-        y, sig_y = self.normalize_pk(y), self.normalize_pk(sig_y, use_mean=False)
+        # y, sig_y = self.normalize_pk(y), self.normalize_pk(sig_y, use_mean=False)
+        y = self.normalize_pk(y)
 
         x = self.hfile['model_params'][idx]
         x = self.normalize_model_params(x) 
         # x = self.transforms(x) 
 
-        return x, y, sig_y
+        cov_inv = self.covariance_matrix_inv
+
+        return x.astype(np.float32), y.astype(np.float32), cov_inv
 
 class PowerspectraDataModule(pl.LightningDataModule):
     """
@@ -136,8 +155,10 @@ class PowerspectraDataModule(pl.LightningDataModule):
         self.train_path = self.params.get("train_path", "./")
         self.val_path = self.params.get("val_path", "./") # Set val to same as train
         self.norm_path = self.params.get("norm_path", "./") # path to file containing normalization measured over training set
+        self.covariance_path = self.params.get("covariance_path", "./") # path to file containing normalization measured over training set
 
         self.multipole_order = self.params.get('multipole_order', 3)
+        self.output_dim = self.params.get('output_dim', 228)
 
         self.num_workers = self.params.get("num_workers", 1)
         self.batch_size = self.params.get("batch_size", 4)
@@ -171,7 +192,9 @@ class PowerspectraDataModule(pl.LightningDataModule):
             self.train_dataset = PowerspectraDataset(
                 self.train_path,
                 self.norm_path,
+                self.covariance_path,
                 train_transforms,
+                output_dim=self.output_dim,
                 multipole_order=self.multipole_order,
             )
             
@@ -181,7 +204,9 @@ class PowerspectraDataModule(pl.LightningDataModule):
             self.val_dataset = PowerspectraDataset(
                 self.val_path,
                 self.norm_path,
+                self.covariance_path,
                 val_transforms,
+                output_dim=self.output_dim,
                 multipole_order=self.multipole_order,
             )
 
@@ -192,7 +217,9 @@ class PowerspectraDataModule(pl.LightningDataModule):
             self.predict_dataset = PowerspectraDataset(
                 self.train_path,
                 self.norm_path,
+                self.covariance_path,
                 predict_transforms,
+                output_dim=self.output_dim,
                 multipole_order=self.multipole_order,
             )
 

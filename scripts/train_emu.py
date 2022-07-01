@@ -30,19 +30,22 @@ def parse_arguments():
     parser.add_argument("--input_dim", type=int, default=7,
                         help="Input dimensionality")
 
-    parser.add_argument("--hidden_dims", nargs='+', default=[256, 256, 256, 256],
+    parser.add_argument("--hidden_dims", nargs='+', default=[256, 256, 256],
                         help="Input dimensionality")
 
     # Data loading
-    parser.add_argument("--train_path", type=str, default='../data/powerspectra_7param_train.h5',
+    parser.add_argument("--train_path", type=str, default='../data/pyrsd_training_set/powerspectra_7param_train.h5',
                         help="Path to hdf5 data file")
 
-    parser.add_argument("--val_path", type=str, default='../data/powerspectra_7param_val.h5',
+    parser.add_argument("--val_path", type=str, default='../data/pyrsd_training_set/powerspectra_7param_val.h5',
                         help="Path to hdf5 data file")
  
-    parser.add_argument("--norm_path", type=str, default='../data/pk_nonlin_convolved_mean_std_normalization.txt',
+    parser.add_argument("--norm_path", type=str, default='../data/pyrsd_training_set/pk_nonlin_convolved_mean_std_normalization.txt',
                         help="Path to hdf5 data file")
-             
+
+    parser.add_argument("--covariance_path", type=str, default='../data/observed/covariance_matrix.npy',
+                        help="Path to hdf5 data file")
+                          
     parser.add_argument("--num_workers", type=int, default=8,
                         help="number of data loader workers")
 
@@ -67,7 +70,7 @@ def parse_arguments():
                         help="Checkpoint model every n epochs")
 
     # Optimizers
-    parser.add_argument("--batch_size", type=int, default=32,
+    parser.add_argument("--batch_size", type=int, default=16,
                         help="Batch size for model training")
 
     parser.add_argument("--learning_rate", type=float, default=0.0001,
@@ -77,7 +80,7 @@ def parse_arguments():
                         help="Max number of training epochs")
 
     parser.add_argument("--optimizer", type=str, default='Adam',
-                        help="Optimizer to use", choices=['Adam'])
+                        help="Optimizer to use", choices=['Adam', 'SGD'])
 
     parser.add_argument("--T_max", type=int, default=100,
                         help="T_max for cosine learning rate scheduler")
@@ -127,9 +130,26 @@ def main(args):
 
     datamodule = data_module.PowerspectraDataModule(params)
 
+    # # # Load covariance matrix
+    # if not os.path.isfile(params['covariance_path']):
+    #     covariance_matrix = torch.eye(params['output_dim']) 
+    # else:
+    #     covariance_matrix = torch.Tensor(np.load(params['covariance_path']).astype(np.float32))
+    #     datamodule.normalize_pk(covariance_matrix, use_mean=False)
+
+    #     covariance_matrix_inv = torch.linalg.inv(covariance_matrix)
+    #     # self.covariance_matrix_inv = self.covariance_matrix_inv.cuda()
+
+    # params['covariance_matrix'] = covariance_matrix
+    # params['covariance_matrix_inv'] = covariance_matrix_inv
+
+
+    if params['verbose']:
+        print(model)
+
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=params['OUTPUT_DIR'],
-        filename='{epoch}-{val_loss:.2f}',
+        filename='{epoch:03d}-{val_loss:.6f}',
         every_n_epochs=params['checkpoint_every_n_epochs'],
         save_top_k=-1,
         save_on_train_epoch_end=True,
@@ -146,14 +166,21 @@ def main(args):
         name='mlp_cosmo_to_pk',
     )
 
-    trainer = pl.Trainer(
-        max_epochs=params['max_epochs'],
-        check_val_every_n_epoch=1,
+
+    trainer = pl.Trainer.from_argparse_args(
+        args,
         callbacks=[checkpoint_callback, lr_monitor],
-        # strategy="ddp_spawn",
         logger=tb_logger,
-        gpus=1,
     )
+    # trainer = pl.Trainer(
+    #     max_epochs=params['max_epochs'],
+    #     check_val_every_n_epoch=1,
+    #     callbacks=[checkpoint_callback, lr_monitor],
+    #     strategy=params['strategy'],
+    #     logger=tb_logger,
+    #     accelerator='cpu',
+    #     gpus=-1,
+    # )
 
     trainer.fit(
         model,

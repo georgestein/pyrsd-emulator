@@ -18,6 +18,7 @@ class MLP(pl.LightningModule):
         
         self.cosmo_to_pk = self.hparams.get('cosmo_to_pk', False)
         self.input_dim = self.hparams.get('input_dim', 100)
+        # self.covariance_matrix = self.hparams.get('covariance_matrix', torch.eye(self.input_dim))
         self.hidden_dims = self.hparams.get('hidden_dims', [4, 8])
         self.output_dim = self.hparams.get('output_dim', 1)
         self.batch_norm = self.hparams.get('batch_norm', False)
@@ -35,6 +36,9 @@ class MLP(pl.LightningModule):
              }
         )        
         
+        # self.covariance_matrix_inv = torch.linalg.inv(self.covariance_matrix)
+        # self.covariance_matrix_inv = self.covariance_matrix_inv.cuda()
+
         mlp = []
         mlp.append(torch.nn.Linear(self.input_dim, self.hidden_dims[0]))
         mlp.append(torch.nn.ReLU())
@@ -79,23 +83,35 @@ class MLP(pl.LightningModule):
         return [optimizer], [scheduler]
 
     def _prepare_batch(self, batch):
-        x, y, sig_y = batch
+        x, y, cov_inv = batch
         if self.cosmo_to_pk:
-            return x, y, sig_y
+            return x, y, cov_inv
         else:
-            return y, x, sig_y
+            return y, x, cov_inv
         
     def _common_step(self, batch, batch_idx, stage: str):
-        x, y, sig_y = self._prepare_batch(batch)
-    
+        x, y, cov_inv = self._prepare_batch(batch)
+
         y_pred = self(x)
+
         noise_floor = 1e-9
         if self.cosmo_to_pk:
             # Negative Gaussian log likelihood loss
-            loss = torch.sum(
-                torch.log(sig_y**2 + noise_floor)/2
-                + (y - y_pred)**2/(2*sig_y**2+noise_floor),
-            )      
+            # Normalization term is unimportant for gradient descent
+
+            # loss = torch.sum(
+            #     torch.log(sig_y**2 + noise_floor)/2
+            #     + (y - y_pred)**2/(2*sig_y**2+noise_floor),
+            # )    
+
+            # loss = torch.sum(
+            #     + (y - y_pred)**2
+            # )    
+
+            # use full covariance matrix
+            diff = (y-y_pred)
+            loss = torch.sum(torch.diagonal((diff @ cov_inv @ diff.T)))
+
         else:
             loss = F.mse_loss(y, self(x))
 
